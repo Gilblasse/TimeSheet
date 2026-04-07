@@ -168,11 +168,15 @@ export default function Timesheet() {
             ))}
           </div>
           <div style={{ padding: "8px 20px" }}>
-            {loading && (
-              <div style={{ padding: "18px 0", textAlign: "center", color: "#8a8ab0", fontSize: 12, letterSpacing: "0.06em" }}>
-                Loading from Google Sheets...
+            {loading && Array.from({ length: 4 }).map((_, idx) => (
+              <div key={`sk-${idx}`} style={{ display: "grid", gridTemplateColumns: "1.6fr 1.4fr 1.4fr 0.8fr 36px", gap: 18, alignItems: "center", padding: "6px 0", borderBottom: idx < 3 ? "1px solid #f0f0f5" : "none" }}>
+                <div className="skeleton" style={{ height: 30 }} />
+                <div className="skeleton" style={{ height: 30 }} />
+                <div className="skeleton" style={{ height: 30 }} />
+                <div className="skeleton" style={{ height: 14, marginLeft: "auto", width: "60%" }} />
+                <div />
               </div>
-            )}
+            ))}
             {!loading && rows.map((row, idx) => (
               <div key={row.id} style={{ display: "grid", gridTemplateColumns: "1.6fr 1.4fr 1.4fr 0.8fr 36px", gap: 18, alignItems: "center", padding: "6px 0", borderBottom: idx < rows.length - 1 ? "1px solid #f0f0f5" : "none" }}>
                 <input aria-label={`date-${idx}`} type="date" value={row.date} onChange={e => updateRow(row.id, "date", e.target.value)}
