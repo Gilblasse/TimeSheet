@@ -106,3 +106,49 @@ export const getInvoice = async (invoiceNumber) => {
   const data = await res.json();
   return normalizeInvoice(data);
 };
+
+// POSTs to Apps Script to create a Gmail draft with the invoice PDF attached.
+// The recipient (`to`) is provided by the user via the modal and is used as
+// the draft's To: field, so the draft opens in Gmail already addressed.
+//
+// Why a plain CORS fetch works here: Apps Script web apps redirect POSTs to
+// script.googleusercontent.com, which serves Access-Control-Allow-Origin: *
+// — so the browser can read the final response. The Content-Type
+// text/plain;charset=utf-8 keeps this request in the CORS-simple lane,
+// avoiding the preflight OPTIONS that Apps Script cannot answer.
+// `listInvoices` / `getInvoice` above rely on the same mechanism for GET.
+export const createInvoiceDraft = async ({
+  invoiceNumber,
+  to,
+  subject,
+  body,
+  pdfBase64,
+}) => {
+  if (!APPS_SCRIPT_URL) throw new Error("VITE_APPS_SCRIPT_URL not configured");
+  if (!to) throw new Error("Missing recipient email");
+  const payload = JSON.stringify({
+    action: "createDraft",
+    invoiceNumber,
+    to,
+    subject,
+    body,
+    pdfBase64,
+  });
+  const res = await fetch(APPS_SCRIPT_URL, {
+    method: "POST",
+    redirect: "follow", // default, but explicit for clarity
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: payload,
+  });
+  if (!res.ok) {
+    throw new Error(`Apps Script HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  if (data && data.error) {
+    // doPost in GSscript.js wraps createGmailDraft in try/catch and returns
+    // { error: err.message } — surface that to the UI instead of pretending
+    // everything worked.
+    throw new Error(data.error);
+  }
+  return data; // { success: true, draftId: "..." }
+};

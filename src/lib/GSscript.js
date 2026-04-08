@@ -1,3 +1,5 @@
+/* eslint-disable */
+// function __authorize() { GmailApp.getAliases(); }
 // ============================================================
 // SkyHorizon Timesheet — Google Apps Script Web App (v4)
 //
@@ -7,6 +9,9 @@
 // (URL stays the same)
 //
 // v4 adds invoice history: saveInvoice / listInvoices / getInvoice
+// v5 adds Gmail draft creation via doPost (createDraft action).
+//     NOTE: v5 introduces GmailApp usage, which adds the Gmail scope.
+//     After re-deploying you will be prompted to re-authorize once.
 // ============================================================
 
 const SHEET_NAME = "Timesheet";
@@ -41,6 +46,57 @@ function doGet(e) {
   return ContentService
     .createTextOutput(JSON.stringify(result))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  let result;
+  try {
+    const body = JSON.parse((e && e.postData && e.postData.contents) || "{}");
+    if (body.action === "createDraft") {
+      result = createGmailDraft(body);
+    } else {
+      result = { error: "Unknown POST action: " + body.action };
+    }
+  } catch (err) {
+    result = { error: err.message };
+  }
+
+  return ContentService
+    .createTextOutput(JSON.stringify(result))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function createGmailDraft(params) {
+  const invoiceNumber = params.invoiceNumber || "invoice";
+  const to = params.to;
+  const subject = params.subject || ("Invoice " + invoiceNumber);
+  const body = params.body || "";
+  const pdfBase64 = params.pdfBase64;
+
+  // Logged to the Apps Script Executions log so silent failures are visible:
+  // script.google.com → Executions → click the row to see this output.
+  console.log("createGmailDraft called", {
+    invoiceNumber: invoiceNumber,
+    to: to,
+    subjectLen: subject.length,
+    bodyLen: body.length,
+    pdfBase64Len: (pdfBase64 || "").length,
+  });
+
+  if (!to) throw new Error("Missing recipient (to)");
+  if (!pdfBase64) throw new Error("Missing pdfBase64");
+
+  const bytes = Utilities.base64Decode(pdfBase64);
+  const blob = Utilities.newBlob(bytes, "application/pdf", invoiceNumber + ".pdf");
+
+  const draft = GmailApp.createDraft(to, subject, body, {
+    attachments: [blob],
+    name: "SkyHorizon Group, LLC",
+  });
+
+  const draftId = draft.getId();
+  console.log("createGmailDraft success", { draftId: draftId });
+  return { success: true, draftId: draftId };
 }
 
 function getOrCreateSheet() {
